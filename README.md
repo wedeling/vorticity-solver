@@ -5,10 +5,11 @@ Spectral code for the forced dissipative 2D vorticity equations:
 
 ![equation](https://latex.codecogs.com/gif.latex?%5Cnabla%5E2%5CPsi%20%3D%20%5Comega.)
 
-## Original paper:
+## References:
+The code solves the problem as outlined in:
 
 W. Verkley, P. Kalverla and C. Severijns, "A maximum entropy approach to the parametrization of subgrid processes in two-dimensional flow", Quarterly Journal of the Royal Meteorological Society, 142, 699, 2273--2283, 2016.
 
-## See also:
+Our paper:
 
 W.Edeling, D. Crommelin, "Reduced data-driven model-error source terms for two-dimensional turbulence", (submitted), 2019.
