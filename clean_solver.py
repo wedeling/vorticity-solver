@@ -42,10 +42,10 @@ def get_w_hat_np1(w_hat_n, w_hat_nm1, VgradW_hat_nm1, P, norm_factor, sgs_hat = 
 #compute spectral filter
 def get_P(cutoff):
     
-    P = np.ones([N, N/2+1])
+    P = np.ones([N, int(N/2+1)])
     
     for i in range(N):
-        for j in range(N/2+1):
+        for j in range(int(N/2+1)):
             
             if np.abs(kx[i, j]) > cutoff or np.abs(ky[i, j]) > cutoff:
                 P[i, j] = 0.0
@@ -60,7 +60,7 @@ def get_P(cutoff):
 
 import numpy as np
 import matplotlib.pyplot as plt
-import os, cPickle
+import os, h5py
 
 plt.close('all')
 plt.rcParams['image.cmap'] = 'seismic'
@@ -80,11 +80,11 @@ axis = np.linspace(0, 2.0*np.pi, N)
 #frequencies
 k = np.fft.fftfreq(N)*N
 
-kx = np.zeros([N, N/2+1]) + 0.0j
-ky = np.zeros([N, N/2+1]) + 0.0j
+kx = np.zeros([N, int(N/2+1)]) + 0.0j
+ky = np.zeros([N, int(N/2+1)]) + 0.0j
 
 for i in range(N):
-    for j in range(N/2+1):
+    for j in range(int(N/2+1)):
         kx[i, j] = 1j*k[j]
         ky[i, j] = 1j*k[i]
 
@@ -113,7 +113,7 @@ mu = 1.0/(day*decay_time_mu)
 
 #start, end time (in days) + time step
 t = 00.0*day
-t_end = 100*day
+t_end = 10*day
 dt = 0.01
 
 n_steps = np.ceil((t_end-t)/dt).astype('int')
@@ -138,11 +138,16 @@ F_hat = np.fft.rfft2(F);
 #restart from a previous stored state (set restart = True, and set t to the end time of previous simulation)
 if restart == True:
     
-    print 'Loading previous state at t =', t
-    state = cPickle.load(open(HOME + '/restart/' + sim_ID + '_t_' + str(np.around(t/day, 1)) + '.pickle'))
-    for key in state.keys():
-        print key
-        vars()[key] = state[key]
+    fname = HOME + '/restart/' + sim_ID + '_t_' + str(np.around(t/day,1)) + '.hdf5'
+    
+    #create HDF5 file
+    h5f = h5py.File(fname, 'r')
+    
+    for key in h5f.keys():
+        print(key)
+        vars()[key] = h5f[key][:]
+        
+    h5f.close()
 #start from initial condition
 else:
     
@@ -160,10 +165,10 @@ else:
     
     t = 0.0
 
-print 'Solving forced dissipative vorticity equations'
-print 'Grid = ', N, 'x', N
-print 't_begin = ', t/day, 'days'
-print 't_end = ', t_end/day, 'days'
+print('Solving forced dissipative vorticity equations')
+print('Grid = ', N, 'x', N)
+print('t_begin = ', t/day, 'days')
+print('t_end = ', t_end/day, 'days')
 
 #time loop
 for n in range(n_steps):
@@ -178,23 +183,28 @@ for n in range(n_steps):
     VgradW_hat_nm1_HF = np.copy(VgradW_hat_n_HF)
     
     if np.mod(n, np.round(day/dt)) == 0:
-        print 'n = ', n, 'of', n_steps
+        print('n = ', n, 'of', n_steps)
     
 #store the state of the system to allow for a simulation restart at t > 0
 if state_store == True:
 
     keys = ['t', 'w_hat_nm1_HF', 'w_hat_n_HF', 'VgradW_hat_nm1_HF']
 
-    state = {}
-
-    for key in keys:
-        state[key] = vars()[key]
-
+    fname = HOME + '/restart/' + sim_ID + '_t_' + str(np.around(t_end/day,1)) + '.hdf5'
+    
     if os.path.exists(HOME + '/restart') == False:
         os.makedirs(HOME + '/restart')
-
-    cPickle.dump(state, open(HOME + '/restart/' + sim_ID + '_t_' + str(np.around(t_end/day,1)) + '.pickle', 'w'))
-
+    
+    #create HDF5 file
+    h5f = h5py.File(fname, 'w')
+    
+    #store numpy sample arrays as individual datasets in the hdf5 file
+    for key in keys:
+        qoi = eval(key)
+        h5f.create_dataset(key, data = qoi)
+        
+    h5f.close()
+    
 #plot vorticity field
 fig = plt.figure('w_np1')
 ax = fig.add_subplot(111, xlabel=r'x', ylabel=r'y', title='t = ' + str(np.around(t/day, 2)) + ' days')
