@@ -52,6 +52,25 @@ def get_P(cutoff):
                 
     return P
 
+#store samples in hierarchical data format, when sample size become very large
+def store_samples_hdf5():
+  
+    fname = HOME + '/samples/' + store_ID + '_t_' + str(np.around(t_end/day, 1)) + '.hdf5'
+    
+    print('Storing samples in ', fname)
+    
+    if os.path.exists(HOME + '/samples') == False:
+        os.makedirs(HOME + '/samples')
+    
+    #create HDF5 file
+    h5f = h5py.File(fname, 'w')
+    
+    #store numpy sample arrays as individual datasets in the hdf5 file
+    for q in QoI:
+        h5f.create_dataset(q, data = samples[q])
+        
+    h5f.close()  
+
 """
 ***************************
 * M A I N   P R O G R A M *
@@ -94,12 +113,9 @@ k_squared_no_zero[0,0] = 1.0
 
 #cutoff in pseudospectral method
 Ncutoff = N/3
-Ncutoff_LF = 2**(I-1)/3 
 
 #spectral filter
 P = get_P(Ncutoff)
-P_LF = get_P(Ncutoff_LF)
-P_U = P - P_LF
 
 #time scale
 Omega = 7.292*10**-5
@@ -113,7 +129,7 @@ mu = 1.0/(day*decay_time_mu)
 
 #start, end time (in days) + time step
 t = 00.0*day
-t_end = 10*day
+t_end = 100*day
 dt = 0.01
 
 n_steps = np.ceil((t_end-t)/dt).astype('int')
@@ -125,11 +141,44 @@ norm_factor = 1.0/(3.0/(2.0*dt) - nu*k_squared + mu)
 # USER KEYS #
 #############
 
+#framerate of storing data, plotting results (1 = every integration time step)
+store_frame_rate = np.floor(1.0*day/dt).astype('int')
+#length of data array
+S = np.floor(n_steps/store_frame_rate).astype('int')
+
 sim_ID = 'run1'
 #store the state at the end of the simulation
 state_store = True
 #restart from a stored state
-restart = False
+restart = False 
+#store data
+store = True
+store_ID = sim_ID
+
+###############################
+# SPECIFY WHICH DATA TO STORE #
+###############################
+
+#TRAINING DATA SET
+QoI = ['w_hat_n_HF', 'VgradW_hat_nm1_HF']
+Q = len(QoI)
+
+#allocate memory
+samples = {}
+
+if store == True:
+    samples['S'] = S
+    samples['N'] = N
+    
+    for q in range(Q):
+        
+        #assume a field contains the string '_hat_'
+        if '_hat_' in QoI[q]:
+            samples[QoI[q]] = np.zeros([S, N, int(N/2+1)]) + 0.0j
+        #a scalar
+        else:
+            samples[QoI[q]] = np.zeros(S)
+
 
 #forcing term
 F = 2**1.5*np.cos(5*x)*np.cos(5*y);
@@ -170,14 +219,25 @@ print('Grid = ', N, 'x', N)
 print('t_begin = ', t/day, 'days')
 print('t_end = ', t_end/day, 'days')
 
+j2 = 0; idx = 0
+
 #time loop
 for n in range(n_steps):
     
     #solve for next time step
     w_hat_np1_HF, VgradW_hat_n_HF = get_w_hat_np1(w_hat_n_HF, w_hat_nm1_HF, VgradW_hat_nm1_HF, P, norm_factor)
 
+    #store samples to dict
+    if j2 == store_frame_rate and store == True:
+        j2 = 0
+
+        for qoi in QoI:
+            samples[qoi][idx] = eval(qoi)
+
+        idx += 1  
+
     #update variables
-    t += dt
+    t += dt; j2 += 1
     w_hat_nm1_HF = np.copy(w_hat_n_HF)
     w_hat_n_HF = np.copy(w_hat_np1_HF)
     VgradW_hat_nm1_HF = np.copy(VgradW_hat_n_HF)
@@ -204,6 +264,10 @@ if state_store == True:
         h5f.create_dataset(key, data = qoi)
         
     h5f.close()
+    
+#store the samples
+if store == True:
+    store_samples_hdf5() 
     
 #plot vorticity field
 fig = plt.figure('w_np1')
