@@ -248,7 +248,7 @@ for n in range(n_steps):
 #store the state of the system to allow for a simulation restart at t > 0
 if state_store == True:
 
-    keys = ['t', 'w_hat_nm1_HF', 'w_hat_n_HF', 'VgradW_hat_nm1_HF']
+    keys = ['w_hat_nm1_HF', 'w_hat_n_HF', 'VgradW_hat_nm1_HF']
 
     fname = HOME + '/restart/' + sim_ID + '_t_' + str(np.around(t_end/day,1)) + '.hdf5'
     
